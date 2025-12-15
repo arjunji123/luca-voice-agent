@@ -1,0 +1,44 @@
+// Messages and strings
+module.exports = {
+  ERRORS: {
+    MISSING_API_KEY: 'Set {key} in .env',
+    STT_ERROR: 'STT Error: {message}',
+    TTS_ERROR: 'TTS Error: {message}',
+    TTS_TIMEOUT: 'Text too long, trying with shortened version...',
+    TRANSCRIPTION_TIMEOUT: 'Transcription timeout - took too long',
+    ASSEMBLY_AI_ERROR: 'Assembly AI error: {error}',
+    GREETING_ERROR: 'Greeting error: {message}',
+    PROCESS_ERROR: 'Error: {message}',
+  },
+  
+  INFO: {
+    KEYS_CONFIGURED: 'All API keys configured',
+    SERVER_RUNNING: 'Server running on port {port}',
+    OPEN_URL: 'Open: http://localhost:{port}',
+    CLIENT_CONNECTED: 'CLIENT CONNECTED: {id}',
+    CLIENT_DISCONNECTED: 'CLIENT DISCONNECTED: {id}',
+    FORM_SUBMITTED: 'FORM SUBMITTED:',
+    MEETING_URL: 'Meeting: {url}',
+    WEBSOCKET_URL: 'WebSocket: {url}',
+    VOICE_MODEL: 'Voice: {model}',
+    BOT_JOINING: 'Bot will join meeting in 30 seconds',
+    GENERATING_AUDIO: 'Generating audio ({chars} chars)...',
+    AUDIO_GENERATED: 'Generated: {bytes} bytes',
+    CONVERSATION_STARTED: "CONVERSATION STARTED with '{botName}'!",
+    CONVERSATION_ENDED: 'Conversation ended by user',
+    RECORDING: 'Recording... {duration}s',
+    DUPLICATE_TRANSCRIPT: 'Duplicate transcript, skipping...',
+    WAITING_FOR_COMMAND: "Conversation started, waiting for command...",
+    SENDING_GREETING: 'Sending greeting...',
+    READY_FOR_INPUT: 'Ready for your input',
+    BOT_RESPONSE: 'BOT: "{text}"',
+    RESPONSE_SENT: 'RESPONSE SENT',
+  },
+  
+  STATUS: {
+    IGNORED: 'Ignored (not in conversation, no \'{botName}\'): "{text}"',
+    PROCESSING: 'Processing audio...',
+    LISTENING_PAUSED: 'Listening paused (processing)',
+    LISTENING_RESUMED: 'Listening resumed',
+  },
+};
