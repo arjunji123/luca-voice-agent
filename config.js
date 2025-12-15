@@ -23,10 +23,12 @@ module.exports = {
   
   DEFAULT_AGENT_CONFIG: {
     botName: 'Luca',
-    prompt: 'You are a helpful voice assistant. Provide complete answers in 2-4 sentences. Maximum 150 words.',
+    prompt: 'You are a helpful voice assistant. Answer in 1-2 sentences only. Keep responses short and concise. Maximum 50 words.',
     greeting: "Hello! I'm your voice assistant. How can I help?",
     model: 'en-US-alina',
   },
+  
+  MAX_RESPONSE_LENGTH: 250,
   
   END_KEYWORDS: [
     'thank you', 'thanks', 'thankyou', 'ty',
@@ -44,7 +46,7 @@ module.exports = {
   
   LLM_CONFIG: {
     model: 'openai/gpt-4o',
-    maxTokens: 200,
+    maxTokens: 100,
   },
   
   TTS_CONFIG: {

@@ -256,7 +256,13 @@ function createAgent(clientId, onAudio) {
         console.log(`You: "${userText}"`);
         context.conversationHistory.push({ role: "user", content: userText });
 
-        const assistantText = await getLLMResponse(userText, context.conversationHistory);
+        let assistantText = await getLLMResponse(userText, context.conversationHistory);
+        
+        // Truncate response if too long
+        if (assistantText.length > config.MAX_RESPONSE_LENGTH) {
+          assistantText = assistantText.substring(0, config.MAX_RESPONSE_LENGTH) + "...";
+        }
+        
         context.conversationHistory.push({ role: "assistant", content: assistantText });
 
         const audioOutput = await synthesizeAudio(assistantText, agentConfig.model);
