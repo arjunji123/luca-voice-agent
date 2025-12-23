@@ -9,6 +9,7 @@ module.exports = {
     ASSEMBLY_AI_ERROR: 'Assembly AI error: {error}',
     GREETING_ERROR: 'Greeting error: {message}',
     PROCESS_ERROR: 'Error: {message}',
+    TASK_ERROR: 'Task error: {message}',
   },
   
   INFO: {
@@ -33,6 +34,8 @@ module.exports = {
     READY_FOR_INPUT: 'Ready for your input',
     BOT_RESPONSE: 'BOT: "{text}"',
     RESPONSE_SENT: 'RESPONSE SENT',
+    TASK_DETECTED: 'Task keyword detected: {task}',
+    TASK_CREATED: 'Task created: {taskId} - Status: {status}',
   },
   
   STATUS: {

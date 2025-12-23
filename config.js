@@ -36,8 +36,19 @@ module.exports = {
     "that's all", 'thats all', 'that is all', 'done', 'finished'
   ],
   
+  TASK_KEYWORDS: [
+    'make a note', 'create a note', 'add a note',
+    'set reminder', 'set an alarm', 'set alarm',
+    'create task', 'create a task', 'add a task', 'create todo',
+    'schedule meeting', 'schedule a meeting',
+    'add to calendar', 'add event',
+    'send message', 'send email', 'send a message',
+    'create reminder', 'create an alarm'
+  ],
+  
   END_MESSAGE: 'Okay, see you later! Call me whenever you need help.',
   ACK_MESSAGE: "Hi! I'm listening. What can I help you with?",
+  TASK_ACK_MESSAGE: "Okay, I'm working on that. Is there anything else?",
   
   WAV_CONFIG: {
     channels: 1,

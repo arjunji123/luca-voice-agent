@@ -12,36 +12,6 @@ const messages = require("./messages");
 const utils = require("./utils");
 const { handleUserInput: handleHiringInput } = require('./hiringIntegration');
 
-const extensionConnector = require('./extensionConnector');
-
-async function checkCredentials() {
-  const credFile = path.join(require('os').homedir(), '.lookoutai-credentials.json');
-  try {
-    if (!fs.existsSync(credFile)) {
-      console.log('\n' + '='.repeat(60));
-      console.log('WARNING: LookoutAI credentials not found');
-      console.log('='.repeat(60));
-      console.log('\nHiring features will not work without credentials.');
-      console.log('\nTo set up credentials, run:');
-      console.log('  node setupCredentials.js');
-      console.log('\nThen restart the voice agent.');
-      console.log('='.repeat(60) + '\n');
-      return false;
-    }
-    const hasCredentials = await extensionConnector.hasCredentials();
-    if (hasCredentials) {
-      const creds = await extensionConnector.getCredentials();
-      const ageMinutes = Math.floor((Date.now() - creds.timestamp) / (1000 * 60));
-      console.log('LookoutAI credentials loaded (Age: ' + ageMinutes + ' minutes)');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.log('Warning: Could not load credentials - ' + error.message);
-    return false;
-  }
-}
-
 // Validate all required API keys
 Object.entries(config.API_KEYS).forEach(([key, value]) => {
   if (!value) {
@@ -513,10 +483,7 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-// Check credentials before starting server
-checkCredentials().then(() => {
 server.listen(config.PORT, () => {
-});
   console.log("\n" + messages.INFO.SERVER_RUNNING.replace("{port}", config.PORT));
   console.log(messages.INFO.OPEN_URL.replace("{port}", config.PORT) + "\n");
 });
