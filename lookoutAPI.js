@@ -1,10 +1,3 @@
-/**
- * LookoutAI API Client
- * 
- * Handles authenticated requests to the LookoutAI API.
- * Automatically manages credentials and authentication headers.
- */
-
 const axios = require('axios');
 const FormData = require('form-data');
 const extensionConnector = require('./extensionConnector');
@@ -13,24 +6,29 @@ const API_URL = process.env.LOOKOUT_API_URL || 'https://lookout-test.onrender.co
 const API_TIMEOUT = 30000;
 const HIRING_CHAT_TYPE = '2';
 
-/**
- * Sends hiring requirements to LookoutAI for candidate search.
- * 
- * @param {string} message - Hiring requirements (role, skills, experience, etc.)
- * @returns {Promise<Object>} Response object with success status and data/error
- */
 async function sendHiringRequest(message) {
   try {
     const credentials = await extensionConnector.getCredentials();
     
     if (!credentials || !credentials.sessionId || !credentials.accessToken) {
-      throw new Error('Missing required credentials');
+      return {
+        success: false,
+        error: 'CREDENTIALS_MISSING',
+        message: 'Run: node syncCredentials.js'
+      };
     }
 
     const formData = new FormData();
     formData.append('message', message);
     formData.append('session_id', credentials.sessionId);
     formData.append('chat_type', HIRING_CHAT_TYPE);
+
+    console.log('📤 API Request:', {
+      url: `${API_URL}/api/luca_message`,
+      session_id: credentials.sessionId,
+      chat_type: HIRING_CHAT_TYPE,
+      message_length: message.length
+    });
 
     const response = await axios.post(
       `${API_URL}/api/luca_message`,
@@ -44,6 +42,8 @@ async function sendHiringRequest(message) {
       }
     );
 
+    console.log('📥 API Response:', response.status, response.data);
+
     return {
       success: true,
       data: response.data
@@ -51,27 +51,37 @@ async function sendHiringRequest(message) {
 
   } catch (error) {
     if (error.response) {
+      console.error('❌ API Error Response:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+
       if (error.response.status === 401) {
         extensionConnector.clearCache();
         return {
           success: false,
-          error: 'Authentication failed. Please re-sync credentials.'
+          error: 'CREDENTIALS_EXPIRED',
+          message: 'Token expired. Run: node syncCredentials.js'
         };
       }
       
       return {
         success: false,
-        error: `API error: ${error.response.status} - ${error.response.statusText}`
+        error: `API_ERROR_${error.response.status}`,
+        message: error.response.data?.description || error.response.data?.message || error.response.statusText,
+        details: error.response.data
       };
     }
 
+    console.error('❌ Network Error:', error.message);
+    
     return {
       success: false,
-      error: error.message
+      error: 'NETWORK_ERROR',
+      message: error.message
     };
   }
 }
 
-module.exports = {
-  sendHiringRequest
-};
+module.exports = { sendHiringRequest };

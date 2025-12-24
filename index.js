@@ -13,33 +13,24 @@ const utils = require("./utils");
 const { handleUserInput: handleHiringInput } = require('./hiringIntegration');
 
 const extensionConnector = require('./extensionConnector');
+const { autoSync } = require('./autoSync');
 
 async function checkCredentials() {
-  const credFile = path.join(require('os').homedir(), '.lookoutai-credentials.json');
-  try {
-    if (!fs.existsSync(credFile)) {
-      console.log('\n' + '='.repeat(60));
-      console.log('WARNING: LookoutAI credentials not found');
-      console.log('='.repeat(60));
-      console.log('\nHiring features will not work without credentials.');
-      console.log('\nTo set up credentials, run:');
-      console.log('  node setupCredentials.js');
-      console.log('\nThen restart the voice agent.');
-      console.log('='.repeat(60) + '\n');
-      return false;
-    }
-    const hasCredentials = await extensionConnector.hasCredentials();
-    if (hasCredentials) {
-      const creds = await extensionConnector.getCredentials();
-      const ageMinutes = Math.floor((Date.now() - creds.timestamp) / (1000 * 60));
-      console.log('LookoutAI credentials loaded (Age: ' + ageMinutes + ' minutes)');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.log('Warning: Could not load credentials - ' + error.message);
-    return false;
+  const syncResult = await autoSync();
+  
+  if (syncResult.synced) {
+    const creds = await extensionConnector.getCredentials();
+    const ageMinutes = Math.floor((Date.now() - creds.timestamp) / (1000 * 60));
+    console.log('✓ LookoutAI credentials valid (Age: ' + ageMinutes + ' minutes)');
+    return true;
   }
+  
+  if (syncResult.needsSync) {
+    console.log('\n⏳ Voice agent will start automatically once credentials are synced...\n');
+    return 'WAITING';
+  }
+  
+  return false;
 }
 
 // Validate all required API keys
@@ -104,38 +95,47 @@ async function transcribeAudio(audioBuffer) {
 
 // Get LLM response via OpenRouter
 async function getLLMResponse(userText, conversationHistory, clientId = 'default') {
-  // ✅ Check for hiring query first
-  const hiringResult = await handleHiringInput(userText, clientId);
-  if (hiringResult) {
-    console.log('🎯 Hiring query processed:', hiringResult.needsMoreInfo ? 'needs details' : 'API called');
-    return hiringResult.message;
-  }
-  
-  // Continue with normal LLM flow
-  const msgs = [
-    ...conversationHistory,
-    { role: "user", content: userText }
-  ];
-
-  const response = await axios.post(config.API_ENDPOINTS.OPENROUTER, {
-    model: config.LLM_CONFIG.model,
-    messages: msgs,
-    max_tokens: config.LLM_CONFIG.maxTokens
-  }, {
-    headers: {
-      Authorization: `Bearer ${config.API_KEYS.OPENROUTER}`,
-      "HTTP-Referer": `http://localhost:${config.PORT}`,
-      "X-Title": "Voice Agent"
+  try {
+    const hiringResult = await handleHiringInput(userText, clientId);
+    
+    if (hiringResult && hiringResult.message) {
+      console.log('🎯 Hiring query:', hiringResult.needsMoreInfo ? 'needs details' : 'processing in background');
+      return hiringResult.message;
     }
-  });
+    
+    const msgs = [
+      ...conversationHistory,
+      { role: "user", content: userText }
+    ];
 
-  const assistantText = response.data.choices[0].message.content;
-  console.log(messages.INFO.BOT_RESPONSE.replace("{text}", assistantText));
-  return assistantText;
+    const response = await axios.post(config.API_ENDPOINTS.OPENROUTER, {
+      model: config.LLM_CONFIG.model,
+      messages: msgs,
+      max_tokens: config.LLM_CONFIG.maxTokens
+    }, {
+      headers: {
+        Authorization: `Bearer ${config.API_KEYS.OPENROUTER}`,
+        "HTTP-Referer": `http://localhost:${config.PORT}`,
+        "X-Title": "Voice Agent"
+      }
+    });
+
+    const assistantText = response.data.choices[0].message.content;
+    console.log(messages.INFO.BOT_RESPONSE.replace("{text}", assistantText));
+    return assistantText;
+    
+  } catch (error) {
+    console.error('LLM Response Error:', error.message);
+    return "I'm having trouble processing that right now. Could you please try again?";
+  }
 }
 
 // Text to speech via Murf.ai
 async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model) {
+  if (!text || typeof text !== 'string') {
+    console.error('TTS Error: Invalid text:', text);
+    return null;
+  }
   try {
     console.log(messages.INFO.GENERATING_AUDIO.replace("{chars}", text.length));
 
@@ -370,18 +370,27 @@ function createAgent(clientId, onAudio) {
 
         let assistantText = await getLLMResponse(userText, context.conversationHistory);
         
+        // Safety check for undefined response
+        if (!assistantText || typeof assistantText !== 'string') {
+          console.error('Got invalid response from LLM:', assistantText);
+          assistantText = "I apologize, I'm having trouble processing that. Could you please try again?";
+        }
+        
         // Truncate response if too long
         if (assistantText.length > config.MAX_RESPONSE_LENGTH) {
           assistantText = assistantText.substring(0, config.MAX_RESPONSE_LENGTH) + "...";
         }
         
         context.conversationHistory.push({ role: "assistant", content: assistantText });
-
         const audioOutput = await synthesizeAudio(assistantText, agentConfig.model);
-        onAudio({
-          trigger: "realtime_audio.bot_output",
-          data: { chunk: audioOutput.toString("base64"), sample_rate: config.SAMPLE_RATE }
-        });
+        
+        // Check if audio was generated
+        if (audioOutput) {
+          onAudio({
+            trigger: "realtime_audio.bot_output",
+            data: { chunk: audioOutput.toString("base64"), sample_rate: config.SAMPLE_RATE }
+          });
+        }
 
         console.log(messages.INFO.RESPONSE_SENT + "\n");
       } catch (error) {
