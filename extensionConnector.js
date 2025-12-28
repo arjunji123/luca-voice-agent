@@ -13,7 +13,7 @@ function setCredentials(sessionId, accessToken) {
     accessToken,
     timestamp: Date.now()
   };
-  console.log('✅ Credentials stored (age: 0ms)');
+  console.log('Credentials stored (age: 0ms)');
   
   // Resolve any pending promise
   if (credentialsResolve) {
@@ -26,11 +26,11 @@ function setCredentials(sessionId, accessToken) {
 async function getCredentialsFromExtension(waitTime = 500) {
   if (credentials) {
     const age = Date.now() - credentials.timestamp;
-    console.log(`✅ Using stored credentials (age: ${Math.round(age/1000)}s)`);
+    console.log(`Using stored credentials (age: ${Math.round(age/1000)}s)`);
     return credentials;
   }
   
-  console.log(`⏳ Waiting for credentials (timeout: ${waitTime}ms)...`);
+  console.log(`Waiting for credentials (timeout: ${waitTime}ms)...`);
   
   // Create promise if not exists
   if (!credentialsPromise) {
@@ -47,7 +47,7 @@ async function getCredentialsFromExtension(waitTime = 500) {
   const result = await Promise.race([credentialsPromise, timeoutPromise]);
   
   if (!result) {
-    console.log('⚠️ Credentials timeout - no credentials received');
+    console.log('Credentials timeout - no credentials received');
     return null;
   }
   

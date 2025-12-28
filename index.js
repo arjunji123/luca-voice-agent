@@ -79,13 +79,18 @@ async function transcribeAudio(audioBuffer) {
 // Get LLM response via OpenRouter
 async function getLLMResponse(userText, conversationHistory, clientId = 'default', sendToClient = null) {
   try {
+    // Check hiring integration first
     const hiringResult = await handleHiringInput(userText, clientId, sendToClient);
     
+    // If hiring integration handled it, return directly WITHOUT calling OpenRouter
     if (hiringResult && hiringResult.message) {
-      console.log('🎯 Hiring query:', hiringResult.needsMoreInfo ? 'needs details' : 'processing in background');
-      return hiringResult.message;
+      console.log('Hiring query handled - skipping OpenRouter');
+      console.log('   Response:', hiringResult.message);
+      return hiringResult.message; // Return immediately, don't call OpenRouter
     }
     
+    // Only call OpenRouter if hiring integration didn't handle it
+    console.log('Calling OpenRouter for non-hiring query...');
     const msgs = [
       ...conversationHistory,
       { role: "user", content: userText }
@@ -511,7 +516,7 @@ const wss = new WebSocketServer({ server });
       // Handle credentials from extension
       if (parsed.trigger === "extension.credentials" && parsed?.data?.sessionId && parsed?.data?.accessToken) {
         extensionConnector.setCredentials(parsed.data.sessionId, parsed.data.accessToken);
-        console.log("✅ Credentials received from extension");
+        console.log("Credentials received from extension");
         return;
       }
       
@@ -534,7 +539,7 @@ const wss = new WebSocketServer({ server });
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket server ready`);
-  console.log(`\n📝 Open http://localhost:${PORT} in your browser\n`);
+  console.log(`\nServer running on http://localhost:${PORT}`);
+  console.log(`WebSocket server ready`);
+  console.log(`\nOpen http://localhost:${PORT} in your browser\n`);
 });

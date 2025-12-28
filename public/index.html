@@ -123,8 +123,8 @@
         // Setup persistent listener for credentials (always active)
         window.addEventListener('message', (event) => {
           if (event.data.type === 'LOOKOUTAI_CREDENTIALS') {
-            console.log('✅ Session ID:', event.data.sessionId);
-            console.log('✅ Access Token:', event.data.accessToken.substring(0, 50) + '...');
+            console.log('Session ID:', event.data.sessionId);
+            console.log('Access Token:', event.data.accessToken.substring(0, 50) + '...');
             
             // Resolve pending promise if exists
             if (credentialsResolver) {
@@ -150,7 +150,7 @@
             // Timeout after 2 seconds
             setTimeout(() => {
               if (credentialsResolver) {
-                console.log('⚠️ Timeout - no credentials response');
+                console.log('Timeout - no credentials response');
                 credentialsResolver(null);
                 credentialsResolver = null;
               }
@@ -168,7 +168,7 @@
             }
             
             // Connect to local WebSocket server
-            console.log('📡 Connecting to WebSocket...');
+            console.log('Connecting to WebSocket...');
             connectWebSocket();
         });
 
@@ -179,10 +179,10 @@
             ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-                console.log('✓ WebSocket connected');
+                console.log('WebSocket connected');
                 
                 // Immediately fetch and send credentials on connection
-                console.log('🔄 Fetching credentials from extension...');
+                console.log('Fetching credentials from extension...');
                 window.getCredentialsFromExtension().then(creds => {
                     if (creds && ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({
@@ -192,23 +192,23 @@
                                 accessToken: creds.accessToken
                             }
                         }));
-                        console.log('✅ Credentials sent to backend on connect');
+                        console.log('Credentials sent to backend on connect');
                     } else {
-                        console.log('⚠️ No credentials available');
+                        console.log('No credentials available');
                     }
                 }).catch(err => {
-                    console.log('❌ Error fetching credentials:', err);
+                    console.log('Error fetching credentials:', err);
                 });
             };
 
             ws.onmessage = (event) => {
                 try {
                     const payload = JSON.parse(event.data);
-                    console.log('📨 Received:', payload.trigger, payload.data);
+                    console.log('Received:', payload.trigger, payload.data);
 
                     // Handle hiring query - get fresh credentials from extension
                     if (payload.trigger === 'hiring.query') {
-                        console.log('🔍 Hiring query detected - fetching credentials...');
+                        console.log('Hiring query detected - fetching credentials...');
                         
                         window.getCredentialsFromExtension().then(creds => {
                             if (creds) {
@@ -219,22 +219,22 @@
                                         accessToken: creds.accessToken
                                     }
                                 }));
-                                console.log('✅ Credentials sent to backend');
+                                console.log('Credentials sent to backend');
                             } else {
-                                console.log('❌ No credentials found');
+                                console.log('No credentials found');
                             }
                         }).catch(err => {
-                            console.log('❌ Error getting credentials:', err);
+                            console.log('Error getting credentials:', err);
                         });
                     }
 
                     // Handle task URL message
                     if (payload.trigger === 'task.url' && payload.data?.url) {
-                        console.log('🎯 Task URL received:', payload.data.url);
+                        console.log('Task URL received:', payload.data.url);
                         // Open task URL in new tab
                         setTimeout(() => {
                             window.open(payload.data.url, '_blank');
-                            console.log('✓ Task tab opened!');
+                            console.log('Task tab opened!');
                         }, 500);
                     }
                 } catch (err) {
@@ -243,11 +243,11 @@
             };
 
             ws.onerror = (error) => {
-                console.error('❌ WebSocket error:', error);
+                console.error('WebSocket error:', error);
             };
 
             ws.onclose = () => {
-                console.log('⚠️ WebSocket disconnected');
+                console.log('WebSocket disconnected');
             };
         }
     </script>

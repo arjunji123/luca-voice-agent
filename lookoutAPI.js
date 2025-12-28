@@ -52,7 +52,7 @@ async function sendHiringRequest(message) {
 
   } catch (error) {
     if (error.response) {
-      console.error('❌ API Error Response:', {
+      console.error('API Error Response:', {
         status: error.response.status,
         statusText: error.response.statusText,
         data: error.response.data
@@ -75,7 +75,7 @@ async function sendHiringRequest(message) {
       };
     }
 
-    console.error('❌ Network Error:', error.message);
+    console.error('Network Error:', error.message);
     
     return {
       success: false,

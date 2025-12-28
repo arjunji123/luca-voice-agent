@@ -43,16 +43,16 @@ async function processHiringQuery(userText, clientId = 'default', sendToClient =
     // Process API in background (credentials already stored from WebSocket connect)
     sendHiringRequest(userText).then(result => {
       if (result.success) {
-        console.log('✅ Hiring API Success:', result.data?.description || 'Candidates being searched');
+        console.log('Hiring API Success:', result.data?.description || 'Candidates being searched');
       } else {
-        console.log('❌ Hiring API Failed:', result.error);
+        console.log('Hiring API Failed:', result.error);
         console.log('   Error details:', result.message);
         if (result.details) {
           console.log('   Response:', JSON.stringify(result.details, null, 2));
         }
       }
     }).catch(err => {
-      console.log('❌ Hiring API Error:', err.message);
+      console.log('Hiring API Error:', err.message);
     });
 
     delete conversationState[clientId];
