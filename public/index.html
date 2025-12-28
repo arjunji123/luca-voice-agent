@@ -118,6 +118,45 @@
         const form = document.getElementById('joinForm');
         const wsUrlInput = document.getElementById('wsUrl');
         let ws = null;
+        let credentialsResolver = null;
+
+        // Setup persistent listener for credentials (always active)
+        window.addEventListener('message', (event) => {
+          if (event.data.type === 'LOOKOUTAI_CREDENTIALS') {
+            console.log('✅ Session ID:', event.data.sessionId);
+            console.log('✅ Access Token:', event.data.accessToken.substring(0, 50) + '...');
+            
+            // Resolve pending promise if exists
+            if (credentialsResolver) {
+              credentialsResolver({
+                sessionId: event.data.sessionId,
+                accessToken: event.data.accessToken,
+                timestamp: Date.now()
+              });
+              credentialsResolver = null;
+            }
+          }
+        });
+
+        // Get credentials using postMessage
+        window.getCredentialsFromExtension = function() {
+          return new Promise((resolve) => {
+            // Set resolver for listener to use
+            credentialsResolver = resolve;
+            
+            // Request credentials from extension
+            window.postMessage({ type: 'GET_LOOKOUTAI_CREDENTIALS' }, '*');
+            
+            // Timeout after 2 seconds
+            setTimeout(() => {
+              if (credentialsResolver) {
+                console.log('⚠️ Timeout - no credentials response');
+                credentialsResolver(null);
+                credentialsResolver = null;
+              }
+            }, 2000);
+          });
+        };
 
         // Validate WebSocket URL
         form.addEventListener('submit', function(event) {
@@ -141,12 +180,53 @@
             
             ws.onopen = () => {
                 console.log('✓ WebSocket connected');
+                
+                // Immediately fetch and send credentials on connection
+                console.log('🔄 Fetching credentials from extension...');
+                window.getCredentialsFromExtension().then(creds => {
+                    if (creds && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            trigger: 'extension.credentials',
+                            data: {
+                                sessionId: creds.sessionId,
+                                accessToken: creds.accessToken
+                            }
+                        }));
+                        console.log('✅ Credentials sent to backend on connect');
+                    } else {
+                        console.log('⚠️ No credentials available');
+                    }
+                }).catch(err => {
+                    console.log('❌ Error fetching credentials:', err);
+                });
             };
 
             ws.onmessage = (event) => {
                 try {
                     const payload = JSON.parse(event.data);
                     console.log('📨 Received:', payload.trigger, payload.data);
+
+                    // Handle hiring query - get fresh credentials from extension
+                    if (payload.trigger === 'hiring.query') {
+                        console.log('🔍 Hiring query detected - fetching credentials...');
+                        
+                        window.getCredentialsFromExtension().then(creds => {
+                            if (creds) {
+                                ws.send(JSON.stringify({
+                                    trigger: 'extension.credentials',
+                                    data: {
+                                        sessionId: creds.sessionId,
+                                        accessToken: creds.accessToken
+                                    }
+                                }));
+                                console.log('✅ Credentials sent to backend');
+                            } else {
+                                console.log('❌ No credentials found');
+                            }
+                        }).catch(err => {
+                            console.log('❌ Error getting credentials:', err);
+                        });
+                    }
 
                     // Handle task URL message
                     if (payload.trigger === 'task.url' && payload.data?.url) {

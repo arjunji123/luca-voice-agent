@@ -13,25 +13,8 @@ const utils = require("./utils");
 const { handleUserInput: handleHiringInput } = require('./hiringIntegration');
 
 const extensionConnector = require('./extensionConnector');
-const { autoSync } = require('./autoSync');
 
-async function checkCredentials() {
-  const syncResult = await autoSync();
-  
-  if (syncResult.synced) {
-    const creds = await extensionConnector.getCredentials();
-    const ageMinutes = Math.floor((Date.now() - creds.timestamp) / (1000 * 60));
-    console.log('✓ LookoutAI credentials valid (Age: ' + ageMinutes + ' minutes)');
-    return true;
-  }
-  
-  if (syncResult.needsSync) {
-    console.log('\n⏳ Voice agent will start automatically once credentials are synced...\n');
-    return 'WAITING';
-  }
-  
-  return false;
-}
+const PORT = config.PORT;
 
 // Validate all required API keys
 Object.entries(config.API_KEYS).forEach(([key, value]) => {
@@ -94,9 +77,9 @@ async function transcribeAudio(audioBuffer) {
 }
 
 // Get LLM response via OpenRouter
-async function getLLMResponse(userText, conversationHistory, clientId = 'default') {
+async function getLLMResponse(userText, conversationHistory, clientId = 'default', sendToClient = null) {
   try {
-    const hiringResult = await handleHiringInput(userText, clientId);
+    const hiringResult = await handleHiringInput(userText, clientId, sendToClient);
     
     if (hiringResult && hiringResult.message) {
       console.log('🎯 Hiring query:', hiringResult.needsMoreInfo ? 'needs details' : 'processing in background');
@@ -368,7 +351,7 @@ function createAgent(clientId, onAudio) {
           return;
         }
 
-        let assistantText = await getLLMResponse(userText, context.conversationHistory);
+        let assistantText = await getLLMResponse(userText, context.conversationHistory, clientId, onAudio);
         
         // Safety check for undefined response
         if (!assistantText || typeof assistantText !== 'string') {
@@ -440,20 +423,6 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "text/html" });
       res.end(data);
     });
-  // } else if (req.method === "GET" && req.url === "/api/pending-tasks") {
-  //   const tasks = Object.values(pendingTasks).filter(task => task.status === "pending");
-  //   res.writeHead(200, { "Content-Type": "application/json" });
-  //   res.end(JSON.stringify(tasks));
-  // } else if (req.method === "GET" && req.url.startsWith("/api/task/")) {
-  //   const taskId = req.url.replace("/api/task/", "");
-  //   const task = pendingTasks[taskId];
-  //   if (task) {
-  //     res.writeHead(200, { "Content-Type": "application/json" });
-  //     res.end(JSON.stringify(task));
-  //   } else {
-  //     res.writeHead(404, { "Content-Type": "application/json" });
-  //     res.end(JSON.stringify({ error: "Task not found" }));
-  //   }
   } else if (req.method === "POST" && req.url === "/join-meeting") {
     let body = "";
     req.on("data", (chunk) => { body += chunk.toString(); });
@@ -522,14 +491,6 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-// Check credentials before starting server
-checkCredentials().then(() => {
-server.listen(config.PORT, () => {
-});
-  console.log("\n" + messages.INFO.SERVER_RUNNING.replace("{port}", config.PORT));
-  console.log(messages.INFO.OPEN_URL.replace("{port}", config.PORT) + "\n");
-});
-
   wss.on("connection", (client, req) => {
   const clientId = `${req.socket.remoteAddress}-${Date.now()}`;
   console.log("\n" + messages.INFO.CLIENT_CONNECTED.replace("{id}", clientId));
@@ -546,6 +507,15 @@ server.listen(config.PORT, () => {
   client.on("message", (msg) => {
     try {
       const parsed = JSON.parse(msg.toString());
+      
+      // Handle credentials from extension
+      if (parsed.trigger === "extension.credentials" && parsed?.data?.sessionId && parsed?.data?.accessToken) {
+        extensionConnector.setCredentials(parsed.data.sessionId, parsed.data.accessToken);
+        console.log("✅ Credentials received from extension");
+        return;
+      }
+      
+      // Handle audio
       if (parsed.trigger === "realtime_audio.mixed" && parsed?.data?.chunk) {
         const audio = Buffer.from(parsed.data.chunk, "base64");
         agent.addAudio(audio);
@@ -560,4 +530,11 @@ server.listen(config.PORT, () => {
     console.log("\n" + messages.INFO.CLIENT_DISCONNECTED.replace("{id}", clientId));
     agent.finish();
   });
+});
+
+// Start server
+server.listen(PORT, () => {
+  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket server ready`);
+  console.log(`\n📝 Open http://localhost:${PORT} in your browser\n`);
 });

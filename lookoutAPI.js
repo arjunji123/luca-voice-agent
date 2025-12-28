@@ -8,13 +8,14 @@ const HIRING_CHAT_TYPE = '2';
 
 async function sendHiringRequest(message) {
   try {
-    const credentials = await extensionConnector.getCredentials();
+    // STEP 1: Get credentials from extension (fresh every time)
+    const credentials = await extensionConnector.getCredentialsFromExtension();
     
     if (!credentials || !credentials.sessionId || !credentials.accessToken) {
       return {
         success: false,
         error: 'CREDENTIALS_MISSING',
-        message: 'Run: node syncCredentials.js'
+        message: 'Missing sessionId or accessToken in request.'
       };
     }
 

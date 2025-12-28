@@ -30,7 +30,7 @@ function askForDetails() {
   };
 }
 
-async function processHiringQuery(userText, clientId = 'default') {
+async function processHiringQuery(userText, clientId = 'default', sendToClient = null) {
   try {
     if (!hasEnoughDetails(userText)) {
       conversationState[clientId] = { waitingForDetails: true };
@@ -40,7 +40,7 @@ async function processHiringQuery(userText, clientId = 'default') {
     // Send immediate response to user
     const immediateMsg = "Processing your hiring request, please wait...";
     
-    // Process API in background (don't wait)
+    // Process API in background (credentials already stored from WebSocket connect)
     sendHiringRequest(userText).then(result => {
       if (result.success) {
         console.log('✅ Hiring API Success:', result.data?.description || 'Candidates being searched');
@@ -72,13 +72,13 @@ async function processHiringQuery(userText, clientId = 'default') {
   }
 }
 
-async function handleUserInput(userText, clientId = 'default') {
+async function handleUserInput(userText, clientId = 'default', sendToClient = null) {
   if (conversationState[clientId]?.waitingForDetails) {
-    return await processHiringQuery(userText, clientId);
+    return await processHiringQuery(userText, clientId, sendToClient);
   }
   
   if (isHiringQuery(userText)) {
-    return await processHiringQuery(userText, clientId);
+    return await processHiringQuery(userText, clientId, sendToClient);
   }
   
   return null;
