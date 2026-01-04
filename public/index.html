@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,24 +16,28 @@
             margin: 0;
             padding: 2rem 0;
         }
+
         .container {
             background: white;
             padding: 3rem;
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             width: 100%;
             max-width: 600px;
         }
+
         h1 {
             text-align: center;
             color: #333;
             font-size: 2rem;
             margin-bottom: 2rem;
         }
+
         form {
             display: flex;
             flex-direction: column;
         }
+
         label {
             margin-top: 1.5rem;
             margin-bottom: 0.75rem;
@@ -40,7 +45,9 @@
             font-size: 1.1rem;
             font-weight: 500;
         }
-        input, textarea {
+
+        input,
+        textarea {
             padding: 1rem;
             border: 1px solid #ccc;
             border-radius: 6px;
@@ -48,6 +55,7 @@
             min-height: 20px;
             font-family: inherit;
         }
+
         select {
             padding: 1rem;
             border: 1px solid #ccc;
@@ -56,16 +64,19 @@
             font-family: inherit;
             background-color: white;
         }
+
         textarea {
             min-height: 80px;
             resize: vertical;
         }
+
         small {
             color: #666;
             margin-top: 0.5rem;
             font-size: 0.9rem;
             display: block;
         }
+
         button {
             margin-top: 2rem;
             padding: 1rem;
@@ -77,28 +88,31 @@
             font-size: 1.1rem;
             font-weight: 500;
         }
+
         button:hover {
             background-color: #0056b3;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Attendee Meeting Agent Demo</h1>
         <form id="joinForm" action="/join-meeting" method="POST">
             <label for="meetingUrl">Meeting URL:</label>
             <input type="url" id="meetingUrl" name="meetingUrl" placeholder="https://meet.google.com/..." required>
-            
+
             <label for="wsUrl">WebSocket Tunnel URL:</label>
             <input type="text" id="wsUrl" name="wsUrl" placeholder="wss://..." required>
             <small>Generate with: ngrok http 5005</small>
-            
+
             <label for="prompt">Agent Prompt:</label>
             <textarea id="prompt" name="prompt" required>You are a super duper helpful assistant</textarea>
-            
+
             <label for="greeting">Greeting Message:</label>
-            <input type="text" id="greeting" name="greeting" value="Hello! I'm your voice assistant. How can I help you today?" required>
-            
+            <input type="text" id="greeting" name="greeting"
+                value="Hello! I'm your voice assistant. How can I help you today?" required>
+
             <label for="model">Voice Model (Murf.ai):</label>
             <select id="model" name="model" required>
                 <option value="en-US-alina">Alina (Female, US)</option>
@@ -110,7 +124,7 @@
                 <option value="en-US-zion">Zion (Male, US)</option>
                 <option value="en-US-riley">Riley (Female, US)</option>
             </select>
-            
+
             <button type="submit">Join Meeting</button>
         </form>
     </div>
@@ -122,66 +136,110 @@
 
         // Setup persistent listener for credentials (always active)
         window.addEventListener('message', (event) => {
-          if (event.data.type === 'LOOKOUTAI_CREDENTIALS') {
-            console.log('Session ID:', event.data.sessionId);
-            console.log('Access Token:', event.data.accessToken.substring(0, 50) + '...');
-            
-            // Resolve pending promise if exists
-            if (credentialsResolver) {
-              credentialsResolver({
-                sessionId: event.data.sessionId,
-                accessToken: event.data.accessToken,
-                timestamp: Date.now()
-              });
-              credentialsResolver = null;
+            if (event.data.type === 'LOOKOUTAI_CREDENTIALS') {
+                console.log('Session ID:', event.data.sessionId);
+                console.log('Access Token:', event.data.accessToken.substring(0, 50) + '...');
+
+                // Resolve pending promise if exists
+                if (credentialsResolver) {
+                    credentialsResolver({
+                        sessionId: event.data.sessionId,
+                        accessToken: event.data.accessToken,
+                        timestamp: Date.now()
+                    });
+                    credentialsResolver = null;
+                }
             }
-          }
         });
 
         // Get credentials using postMessage
-        window.getCredentialsFromExtension = function() {
-          return new Promise((resolve) => {
-            // Set resolver for listener to use
-            credentialsResolver = resolve;
-            
-            // Request credentials from extension
-            window.postMessage({ type: 'GET_LOOKOUTAI_CREDENTIALS' }, '*');
-            
-            // Timeout after 2 seconds
-            setTimeout(() => {
-              if (credentialsResolver) {
-                console.log('Timeout - no credentials response');
-                credentialsResolver(null);
-                credentialsResolver = null;
-              }
-            }, 2000);
-          });
+        window.getCredentialsFromExtension = function () {
+            return new Promise((resolve) => {
+                // Set resolver for listener to use
+                credentialsResolver = resolve;
+
+                // Request credentials from extension
+                window.postMessage({ type: 'GET_LOOKOUTAI_CREDENTIALS' }, '*');
+
+                // Timeout after 2 seconds
+                setTimeout(() => {
+                    if (credentialsResolver) {
+                        console.log('Timeout - no credentials response');
+                        credentialsResolver(null);
+                        credentialsResolver = null;
+                    }
+                }, 2000);
+            });
         };
 
-        // Validate WebSocket URL
-        form.addEventListener('submit', function(event) {
+        // Validate WebSocket URL and fetch credentials before submit
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault(); // Prevent default form submission
+
             const wsUrl = wsUrlInput.value.trim();
             if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
                 alert('WebSocket Tunnel URL must start with ws:// or wss://');
-                event.preventDefault();
                 return;
             }
-            
-            // Connect to local WebSocket server
-            console.log('Connecting to WebSocket...');
-            connectWebSocket();
+
+            // Fetch credentials from extension
+            console.log('🔑 Fetching credentials from extension...');
+            const creds = await window.getCredentialsFromExtension();
+
+            if (!creds || !creds.sessionId || !creds.accessToken) {
+                alert('❌ Please login to LookoutAI first!\n\nOpen https://lookoutai-dev.web.app and login.');
+                return;
+            }
+
+            console.log('✅ Credentials received:', {
+                sessionId: creds.sessionId.substring(0, 20) + '...',
+                accessToken: creds.accessToken.substring(0, 30) + '...'
+            });
+
+            // Create FormData with all fields including credentials
+            const formData = new FormData(form);
+            formData.append('sessionId', creds.sessionId);
+            formData.append('accessToken', creds.accessToken);
+
+            // Submit form with credentials
+            console.log('📤 Submitting form with credentials...');
+            fetch('/join-meeting', {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            }).then(response => {
+                if (response.ok) {
+                    console.log('✅ Bot joining meeting with credentials stored!');
+                    // Connect WebSocket
+                    connectWebSocket();
+                } else {
+                    alert('Failed to join meeting. Check console for details.');
+                }
+            }).catch(err => {
+                console.error('Form submission error:', err);
+                alert('Error submitting form: ' + err.message);
+            });
         });
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}`;
-            
+
             ws = new WebSocket(wsUrl);
-            
+
             ws.onopen = () => {
                 console.log('WebSocket connected');
-                
-                // Immediately fetch and send credentials on connection
+
+                // Send meeting URL to server
+                const meetingUrl = document.getElementById('meetingUrl').value;
+                if (meetingUrl) {
+                    ws.send(JSON.stringify({
+                        trigger: 'meeting.init',
+                        data: { meetingUrl: meetingUrl }
+                    }));
+                    console.log('📍 Meeting URL sent to server:', meetingUrl);
+                }
+
+                // Fetch and send credentials on connection (backup)
                 console.log('Fetching credentials from extension...');
                 window.getCredentialsFromExtension().then(creds => {
                     if (creds && ws.readyState === WebSocket.OPEN) {
@@ -209,7 +267,7 @@
                     // Handle hiring query - get fresh credentials from extension
                     if (payload.trigger === 'hiring.query') {
                         console.log('Hiring query detected - fetching credentials...');
-                        
+
                         window.getCredentialsFromExtension().then(creds => {
                             if (creds) {
                                 ws.send(JSON.stringify({
@@ -227,16 +285,6 @@
                             console.log('Error getting credentials:', err);
                         });
                     }
-
-                    // Handle task URL message
-                    if (payload.trigger === 'task.url' && payload.data?.url) {
-                        console.log('Task URL received:', payload.data.url);
-                        // Open task URL in new tab
-                        setTimeout(() => {
-                            window.open(payload.data.url, '_blank');
-                            console.log('Task tab opened!');
-                        }, 500);
-                    }
                 } catch (err) {
                     console.error('Message parse error:', err);
                 }
@@ -252,4 +300,5 @@
         }
     </script>
 </body>
-</html> 
+
+</html>

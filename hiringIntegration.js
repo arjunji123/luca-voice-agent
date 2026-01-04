@@ -30,18 +30,20 @@ function askForDetails() {
   };
 }
 
-async function processHiringQuery(userText, clientId = 'default', sendToClient = null) {
+async function processHiringQuery(userText, meetingUrl = null, sendToClient = null) {
+  const clientKey = meetingUrl || 'default';
+
   try {
     if (!hasEnoughDetails(userText)) {
-      conversationState[clientId] = { waitingForDetails: true };
+      conversationState[clientKey] = { waitingForDetails: true };
       return askForDetails();
     }
 
     // Send immediate response to user
     const immediateMsg = "Processing your hiring request, please wait...";
-    
-    // Process API in background (credentials already stored from WebSocket connect)
-    sendHiringRequest(userText).then(result => {
+
+    // Process API in background with meetingUrl for credential retrieval
+    sendHiringRequest(userText, meetingUrl).then(result => {
       if (result.success) {
         console.log('Hiring API Success:', result.data?.description || 'Candidates being searched');
       } else {
@@ -55,32 +57,34 @@ async function processHiringQuery(userText, clientId = 'default', sendToClient =
       console.log('Hiring API Error:', err.message);
     });
 
-    delete conversationState[clientId];
-    
+    delete conversationState[clientKey];
+
     return {
       success: true,
       needsMoreInfo: false,
       message: immediateMsg + " I'll notify you once candidates are found. Check your dashboard for results."
     };
-    
+
   } catch (error) {
-    delete conversationState[clientId];
-    return { 
-      success: false, 
+    delete conversationState[clientKey];
+    return {
+      success: false,
       message: 'Error processing request.'
     };
   }
 }
 
-async function handleUserInput(userText, clientId = 'default', sendToClient = null) {
-  if (conversationState[clientId]?.waitingForDetails) {
-    return await processHiringQuery(userText, clientId, sendToClient);
+async function handleUserInput(userText, meetingUrl = null, sendToClient = null) {
+  const clientKey = meetingUrl || 'default';
+
+  if (conversationState[clientKey]?.waitingForDetails) {
+    return await processHiringQuery(userText, meetingUrl, sendToClient);
   }
-  
+
   if (isHiringQuery(userText)) {
-    return await processHiringQuery(userText, clientId, sendToClient);
+    return await processHiringQuery(userText, meetingUrl, sendToClient);
   }
-  
+
   return null;
 }
 

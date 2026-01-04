@@ -1,60 +1,76 @@
 /**
  * Extension Connector
- * Minimal memory store - receives credentials from browser via WebSocket
+ * Meeting URL-based credential storage
+ * Credentials are stored per meeting URL when form is submitted
  */
 
-let credentials = null;
-let credentialsPromise = null;
-let credentialsResolve = null;
+// Map: meetingUrl -> { sessionId, accessToken, timestamp }
+const meetingCredentials = new Map();
 
-function setCredentials(sessionId, accessToken) {
-  credentials = {
+/**
+ * Store credentials for a specific meeting URL
+ * Called when form is submitted with meeting URL + credentials from extension
+ * @param {string} meetingUrl - The meeting URL (from form)
+ * @param {string} sessionId - LookoutAI session ID (from extension)
+ * @param {string} accessToken - LookoutAI access token (from extension)
+ */
+function setCredentialsForMeeting(meetingUrl, sessionId, accessToken) {
+  const credentials = {
     sessionId,
     accessToken,
     timestamp: Date.now()
   };
-  console.log('Credentials stored (age: 0ms)');
-  
-  // Resolve any pending promise
-  if (credentialsResolve) {
-    credentialsResolve(credentials);
-    credentialsResolve = null;
-    credentialsPromise = null;
+
+  meetingCredentials.set(meetingUrl, credentials);
+  console.log(`✅ Credentials stored for meeting: ${meetingUrl}`);
+  console.log(`   Session ID: ${sessionId.substring(0, 20)}...`);
+  console.log(`   Total meetings: ${meetingCredentials.size}`);
+}
+
+/**
+ * Get credentials for a specific meeting URL
+ * Called when API needs to be hit for a specific meeting
+ * @param {string} meetingUrl - The meeting URL
+ * @returns {Object|null} Credentials or null if not found
+ */
+function getCredentialsForMeeting(meetingUrl) {
+  // Try to get credentials for this specific meeting
+  const credentials = meetingCredentials.get(meetingUrl);
+
+  if (credentials) {
+    const age = Date.now() - credentials.timestamp;
+    console.log(`📦 Using credentials for meeting: ${meetingUrl}`);
+    console.log(`   Age: ${Math.round(age / 1000)}s`);
+    return credentials;
+  }
+
+
+  console.log(`❌ No credentials found for meeting: ${meetingUrl}`);
+  return null;
+}
+
+/**
+ * Clear credentials for a specific meeting
+ * @param {string} meetingUrl - The meeting URL
+ */
+function clearCredentialsForMeeting(meetingUrl) {
+  const deleted = meetingCredentials.delete(meetingUrl);
+  if (deleted) {
+    console.log(`🗑️  Credentials cleared for meeting: ${meetingUrl}`);
   }
 }
 
-async function getCredentialsFromExtension(waitTime = 500) {
-  if (credentials) {
-    const age = Date.now() - credentials.timestamp;
-    console.log(`Using stored credentials (age: ${Math.round(age/1000)}s)`);
-    return credentials;
-  }
-  
-  console.log(`Waiting for credentials (timeout: ${waitTime}ms)...`);
-  
-  // Create promise if not exists
-  if (!credentialsPromise) {
-    credentialsPromise = new Promise((resolve) => {
-      credentialsResolve = resolve;
-    });
-  }
-  
-  // Race between promise and timeout
-  const timeoutPromise = new Promise((resolve) => {
-    setTimeout(() => resolve(null), waitTime);
-  });
-  
-  const result = await Promise.race([credentialsPromise, timeoutPromise]);
-  
-  if (!result) {
-    console.log('Credentials timeout - no credentials received');
-    return null;
-  }
-  
-  return result;
+/**
+ * Get all stored meeting URLs (for debugging)
+ * @returns {Array<string>} Array of meeting URLs
+ */
+function getAllMeetingUrls() {
+  return Array.from(meetingCredentials.keys());
 }
 
 module.exports = {
-  setCredentials,
-  getCredentialsFromExtension
+  setCredentialsForMeeting,
+  getCredentialsForMeeting,
+  clearCredentialsForMeeting,
+  getAllMeetingUrls
 };

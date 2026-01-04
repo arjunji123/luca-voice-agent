@@ -83,18 +83,11 @@ function formatMessage(template, variables = {}) {
   return message;
 }
 
-// Detect if text contains task keywords
-function hasTaskKeyword(text) {
-  const lowerText = text.toLowerCase();
-  return config.TASK_KEYWORDS.some(keyword => lowerText.includes(keyword));
-}
-
 module.exports = {
   isSimilarWord,
   removeBotNameFromText,
   createWavHeader,
   isSilentChunk,
   generateFallbackTone,
-  formatMessage,
-  hasTaskKeyword,
+  formatMessage
 };

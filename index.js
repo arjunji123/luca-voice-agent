@@ -77,18 +77,18 @@ async function transcribeAudio(audioBuffer) {
 }
 
 // Get LLM response via OpenRouter
-async function getLLMResponse(userText, conversationHistory, clientId = 'default', sendToClient = null) {
+async function getLLMResponse(userText, conversationHistory, clientId = 'default', meetingUrl = null, sendToClient = null) {
   try {
-    // Check hiring integration first
-    const hiringResult = await handleHiringInput(userText, clientId, sendToClient);
-    
+    // Check hiring integration first - pass meetingUrl for credential retrieval
+    const hiringResult = await handleHiringInput(userText, meetingUrl, sendToClient);
+
     // If hiring integration handled it, return directly WITHOUT calling OpenRouter
     if (hiringResult && hiringResult.message) {
       console.log('Hiring query handled - skipping OpenRouter');
       console.log('   Response:', hiringResult.message);
       return hiringResult.message; // Return immediately, don't call OpenRouter
     }
-    
+
     // Only call OpenRouter if hiring integration didn't handle it
     console.log('Calling OpenRouter for non-hiring query...');
     const msgs = [
@@ -111,7 +111,7 @@ async function getLLMResponse(userText, conversationHistory, clientId = 'default
     const assistantText = response.data.choices[0].message.content;
     console.log(messages.INFO.BOT_RESPONSE.replace("{text}", assistantText));
     return assistantText;
-    
+
   } catch (error) {
     console.error('LLM Response Error:', error.message);
     return "I'm having trouble processing that right now. Could you please try again?";
@@ -159,74 +159,12 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
   }
 }
 
-// Handle task execution - generate mock URL and log it
-async function executeTask(taskDescription, onAudio) {
-  try {
-    // Step 1: Send waiting message to user
-    console.log("\n[Task] Sending waiting message to user...");
-    const waitingMessage = "Wait, I'm working on your task. Please wait...";
-    const waitingAudio = await synthesizeAudio(waitingMessage, agentConfig.model);
-    onAudio({
-      trigger: "realtime_audio.bot_output",
-      data: { 
-        chunk: waitingAudio.toString("base64"), 
-        sample_rate: config.SAMPLE_RATE
-      }
-    });
-    
-    // Step 2: Simulate task processing with delay (3-5 seconds for testing)
-    console.log("[Task] Processing... (waiting 4 seconds for testing)");
-    await new Promise(resolve => setTimeout(resolve, 4000));
-    
-    // Step 3: Generate mock task ID and URL
-    const taskId = "TASK_" + Date.now();
-    const taskUrl = `https://tasks.example.com/task/${taskId}`;
-    
-    console.log(`\n[Task] Task created: ${taskId}`);
-    console.log(`[Task] Task URL: ${taskUrl}`);
-    
-    // Send task URL to browser via WebSocket to open in new tab
-    console.log("[Task] Sending URL to browser...");
-    
-    // Store URL globally for browser to fetch via HTTP
-    lastTaskUrl = { url: taskUrl, taskId: taskId, timestamp: Date.now() };
-    
-    onAudio({
-      trigger: "task.url",
-      data: { url: taskUrl, taskId: taskId, timestamp: Date.now() }
-    });
-    
-    // Step 5: Send completion message to user
-    console.log("[Task] Sending completion message...");
-    const completionMessage = "Done! Your task has been completed successfully. The link has been opened in a new tab.";
-    const completionAudio = await synthesizeAudio(completionMessage, agentConfig.model);
-    onAudio({
-      trigger: "realtime_audio.bot_output",
-      data: { 
-        chunk: completionAudio.toString("base64"), 
-        sample_rate: config.SAMPLE_RATE
-      }
-    });
-    
-    return { taskId, url: taskUrl };
-  } catch (error) {
-    console.error("Task execution error:", error.message);
-    const errorAudio = await synthesizeAudio("Sorry, I couldn't create that task. Try again.", agentConfig.model);
-    onAudio({
-      trigger: "realtime_audio.bot_output",
-      data: { chunk: errorAudio.toString("base64"), sample_rate: config.SAMPLE_RATE }
-    });
-    return null;
-  }
-}
-
-// Store last task URL globally
-let lastTaskUrl = null;
 
 let agentConfig = { ...config.DEFAULT_AGENT_CONFIG };
 const clientContexts = new Map();
+const clientToMeetingUrl = new Map(); // Track which client is in which meeting
 
-function createAgent(clientId, onAudio) {
+function createAgent(clientId, meetingUrl, onAudio) {
   const context = {
     conversationHistory: [
       { role: "system", content: agentConfig.prompt }
@@ -236,10 +174,12 @@ function createAgent(clientId, onAudio) {
     inConversation: false,
     audioBuffer: Buffer.alloc(0),
     audioTimeout: null,
-    lastTranscript: ""
+    lastTranscript: "",
+    meetingUrl: meetingUrl // Store meeting URL in context
   };
 
   clientContexts.set(clientId, context);
+  clientToMeetingUrl.set(clientId, meetingUrl); // Map clientId to meeting URL
 
   const agent = {
     addAudio(audioChunk) {
@@ -347,31 +287,22 @@ function createAgent(clientId, onAudio) {
         console.log(`You: "${userText}"`);
         context.conversationHistory.push({ role: "user", content: userText });
 
-        // Check for task keywords
-        if (utils.hasTaskKeyword(userText)) {
-          console.log("Task detected. Executing...");
-          await executeTask(userText, onAudio);
-          context.isListening = true;
-          context.isProcessing = false;
-          return;
-        }
+        let assistantText = await getLLMResponse(userText, context.conversationHistory, clientId, context.meetingUrl, onAudio);
 
-        let assistantText = await getLLMResponse(userText, context.conversationHistory, clientId, onAudio);
-        
         // Safety check for undefined response
         if (!assistantText || typeof assistantText !== 'string') {
           console.error('Got invalid response from LLM:', assistantText);
           assistantText = "I apologize, I'm having trouble processing that. Could you please try again?";
         }
-        
+
         // Truncate response if too long
         if (assistantText.length > config.MAX_RESPONSE_LENGTH) {
           assistantText = assistantText.substring(0, config.MAX_RESPONSE_LENGTH) + "...";
         }
-        
+
         context.conversationHistory.push({ role: "assistant", content: assistantText });
         const audioOutput = await synthesizeAudio(assistantText, agentConfig.model);
-        
+
         // Check if audio was generated
         if (audioOutput) {
           onAudio({
@@ -433,25 +364,31 @@ const server = http.createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk.toString(); });
     req.on("end", () => {
       const formData = parse(body);
+      const meetingUrl = formData.meetingUrl;
+      const sessionId = formData.sessionId;
+      const accessToken = formData.accessToken;
+
+      // Store credentials for this meeting URL
+      if (meetingUrl && sessionId && accessToken) {
+        extensionConnector.setCredentialsForMeeting(meetingUrl, sessionId, accessToken);
+
+      }
+
       agentConfig.prompt = formData.prompt || agentConfig.prompt;
       agentConfig.greeting = formData.greeting || agentConfig.greeting;
       agentConfig.model = formData.model || agentConfig.model;
 
       console.log("\n" + messages.INFO.FORM_SUBMITTED);
-      console.log("   " + messages.INFO.MEETING_URL.replace("{url}", formData.meetingUrl));
+      console.log("   " + messages.INFO.MEETING_URL.replace("{url}", meetingUrl));
       console.log("   " + messages.INFO.WEBSOCKET_URL.replace("{url}", formData.wsUrl));
       console.log("   " + messages.INFO.VOICE_MODEL.replace("{model}", agentConfig.model));
 
-      // MOCK MODE: Generate task URL and store it
-      const taskId = `TASK_${Date.now()}`;
-      const mockTaskUrl = `https://tasks.example.com/task/${taskId}`;
-      lastTaskUrl = { url: mockTaskUrl, taskId: taskId };
       const attendeeData = JSON.stringify({
-        meeting_url: formData.meetingUrl,
+        meeting_url: meetingUrl,
         bot_name: "Voice Agent",
         websocket_settings: {
           audio: {
-            url: formData.wsUrl,
+            url: formData.wsUrl + '?meetingUrl=' + encodeURIComponent(meetingUrl),
             sample_rate: config.SAMPLE_RATE
           }
         }
@@ -496,30 +433,46 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-  wss.on("connection", (client, req) => {
+wss.on("connection", (client, req) => {
   const clientId = `${req.socket.remoteAddress}-${Date.now()}`;
   console.log("\n" + messages.INFO.CLIENT_CONNECTED.replace("{id}", clientId));
 
-  // Create agent instance
-  // Send WebSocket messages for all audio output
-  const agent = createAgent(clientId, (payload) => {
-    // Send audio and other messages through WebSocket to browser
+  // Extract meeting URL from query parameters (if provided by Attendee.dev bot)
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const meetingUrlFromQuery = url.searchParams.get('meetingUrl');
+
+  // Use meeting URL from query or create default
+  const meetingUrl = meetingUrlFromQuery || 'default-meeting-' + Date.now();
+
+  if (meetingUrlFromQuery) {
+    console.log(`📍 Meeting URL from query: ${meetingUrlFromQuery}`);
+  }
+
+  const agent = createAgent(clientId, meetingUrl, (payload) => {
     console.log(`[WS] Sending to client ${clientId}:`, payload.trigger);
     client.send(JSON.stringify(payload));
   });
 
-  // Receive audio chunks from browser
+  // Receive messages from browser
   client.on("message", (msg) => {
     try {
       const parsed = JSON.parse(msg.toString());
-      
-      // Handle credentials from extension
-      if (parsed.trigger === "extension.credentials" && parsed?.data?.sessionId && parsed?.data?.accessToken) {
-        extensionConnector.setCredentials(parsed.data.sessionId, parsed.data.accessToken);
-        console.log("Credentials received from extension");
+
+      // Handle meeting URL initialization (sent first from client)
+      if (parsed.trigger === "meeting.init" && parsed?.data?.meetingUrl) {
+        const meetingUrl = parsed.data.meetingUrl;
+        console.log(`📍 Meeting URL received: ${meetingUrl}`);
+
+        // Update agent's meeting URL (agent already created on connection)
+        const context = clientContexts.get(clientId);
+        if (context) {
+          context.meetingUrl = meetingUrl;
+          clientToMeetingUrl.set(clientId, meetingUrl);
+          console.log(`✅ Agent meeting URL updated to: ${meetingUrl}`);
+        }
         return;
       }
-      
+
       // Handle audio
       if (parsed.trigger === "realtime_audio.mixed" && parsed?.data?.chunk) {
         const audio = Buffer.from(parsed.data.chunk, "base64");
@@ -534,6 +487,7 @@ const wss = new WebSocketServer({ server });
   client.on("close", () => {
     console.log("\n" + messages.INFO.CLIENT_DISCONNECTED.replace("{id}", clientId));
     agent.finish();
+    clientToMeetingUrl.delete(clientId);
   });
 });
 
