@@ -201,6 +201,11 @@
             formData.append('sessionId', creds.sessionId);
             formData.append('accessToken', creds.accessToken);
 
+            // Disable submit button to prevent double submission
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Joining...';
+
             // Submit form with credentials
             console.log('📤 Submitting form with credentials...');
             fetch('/join-meeting', {
@@ -209,14 +214,26 @@
             }).then(response => {
                 if (response.ok) {
                     console.log('✅ Bot joining meeting with credentials stored!');
+
+                    // Show success message
+                    alert('✅ Success! Bot is joining the meeting.\n\nThe bot will join in ~30 seconds.');
+
+                    // Reset button
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Join Meeting';
+
                     // Connect WebSocket
                     connectWebSocket();
                 } else {
-                    alert('Failed to join meeting. Check console for details.');
+                    alert('❌ Failed to join meeting. Check console for details.');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Join Meeting';
                 }
             }).catch(err => {
                 console.error('Form submission error:', err);
                 alert('Error submitting form: ' + err.message);
+                submitButton.disabled = false;
+                submitButton.textContent = 'Join Meeting';
             });
         });
 
