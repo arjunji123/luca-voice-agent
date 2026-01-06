@@ -132,7 +132,9 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
       voiceId: voiceId,
       model: config.TTS_CONFIG.model,
       format: config.TTS_CONFIG.format,
-      sampleRate: config.SAMPLE_RATE
+      sampleRate: config.SAMPLE_RATE,
+      speed: config.TTS_CONFIG.speed,        // Natural speed variation
+      style: config.TTS_CONFIG.style         // Conversational tone
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -245,7 +247,9 @@ function createAgent(clientId, meetingUrl, onAudio) {
         if (context.inConversation && hasEndKeyword) {
           console.log(messages.INFO.CONVERSATION_ENDED);
           context.inConversation = false;
-          const audioOutput = await synthesizeAudio(messages.END_MESSAGE, agentConfig.model);
+          // Random ending message
+          const randomEnd = config.END_MESSAGES[Math.floor(Math.random() * config.END_MESSAGES.length)];
+          const audioOutput = await synthesizeAudio(randomEnd, agentConfig.model);
           onAudio({
             trigger: "realtime_audio.bot_output",
             data: { chunk: audioOutput.toString("base64"), sample_rate: config.SAMPLE_RATE }
@@ -273,7 +277,9 @@ function createAgent(clientId, meetingUrl, onAudio) {
 
           if (!userText) {
             console.log(messages.INFO.WAITING_FOR_COMMAND);
-            const audioOutput = await synthesizeAudio(messages.ACK_MESSAGE, agentConfig.model);
+            // Random acknowledgment message
+            const randomAck = config.ACK_MESSAGES[Math.floor(Math.random() * config.ACK_MESSAGES.length)];
+            const audioOutput = await synthesizeAudio(randomAck, agentConfig.model);
             onAudio({
               trigger: "realtime_audio.bot_output",
               data: { chunk: audioOutput.toString("base64"), sample_rate: config.SAMPLE_RATE }
@@ -324,7 +330,9 @@ function createAgent(clientId, meetingUrl, onAudio) {
       try {
         context.isListening = false;
         console.log(messages.INFO.SENDING_GREETING);
-        const audioOutput = await synthesizeAudio(agentConfig.greeting, agentConfig.model);
+        // Random greeting from array
+        const randomGreeting = agentConfig.greetings[Math.floor(Math.random() * agentConfig.greetings.length)];
+        const audioOutput = await synthesizeAudio(randomGreeting, agentConfig.model);
         onAudio({
           trigger: "realtime_audio.bot_output",
           data: { chunk: audioOutput.toString("base64"), sample_rate: config.SAMPLE_RATE }
@@ -374,14 +382,12 @@ const server = http.createServer((req, res) => {
 
       }
 
-      agentConfig.prompt = formData.prompt || agentConfig.prompt;
-      agentConfig.greeting = formData.greeting || agentConfig.greeting;
-      agentConfig.model = formData.model || agentConfig.model;
+      // Prompt, model, and greeting are all fixed in config now
 
       console.log("\n" + messages.INFO.FORM_SUBMITTED);
       console.log("   " + messages.INFO.MEETING_URL.replace("{url}", meetingUrl));
       console.log("   " + messages.INFO.WEBSOCKET_URL.replace("{url}", formData.wsUrl));
-      console.log("   " + messages.INFO.VOICE_MODEL.replace("{model}", agentConfig.model));
+      console.log("   Voice Model: en-US-natalie (Natural & Conversational)");
 
       const attendeeData = JSON.stringify({
         meeting_url: meetingUrl,
