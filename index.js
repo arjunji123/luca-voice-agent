@@ -153,9 +153,25 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
       timeout: config.TTS_CONFIG.timeout
     });
 
-    const audioBuffer = Buffer.from(response.data);
+    let audioBuffer = Buffer.from(response.data);
+
+    // Murf.ai returns WAV format - strip the 44-byte WAV header to get raw PCM
+    // This ensures compatibility with the audio stream
+    if (audioBuffer.length > 44 && audioBuffer.toString('ascii', 0, 4) === 'RIFF') {
+      console.log('   Stripping WAV header (44 bytes)');
+      audioBuffer = audioBuffer.slice(44);
+    }
+
+    const estimatedDuration = (audioBuffer.length / (config.SAMPLE_RATE * 2)).toFixed(1);
     console.log(`✅ Audio generated: ${audioBuffer.length} bytes`);
-    console.log(`   Estimated duration: ~${(audioBuffer.length / (config.SAMPLE_RATE * 2)).toFixed(1)}s`);
+    console.log(`   Estimated duration: ~${estimatedDuration}s`);
+
+    // Validate audio length - should be roughly 1-2 seconds per 20 characters
+    const expectedMinDuration = (text.length / 20) * 0.5; // Minimum expected
+    if (parseFloat(estimatedDuration) < expectedMinDuration) {
+      console.warn(`⚠️  Audio seems short! Expected at least ${expectedMinDuration.toFixed(1)}s for ${text.length} chars`);
+    }
+
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     return audioBuffer;

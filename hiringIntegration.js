@@ -1,19 +1,29 @@
 const { sendHiringRequest } = require('./lookoutAPI');
 
+// More specific hiring keywords to avoid false positives
 const HIRING_KEYWORDS = [
-  'hire', 'hiring', 'recruit', 'recruiting', 'recruitment',
-  'candidate', 'candidates', 'talent', 'developer', 'engineer',
-  'looking for', 'need', 'required', 'position', 'role',
-  'job opening', 'vacancy', 'opening', 'search for',
-  'full stack', 'frontend', 'backend', 'devops', 'data scientist',
-  'ml engineer', 'designer', 'product manager', 'tech lead'
+  'hire someone', 'hiring for', 'recruit', 'recruiting', 'recruitment',
+  'find candidate', 'find candidates', 'need candidate', 'looking for candidate',
+  'job opening', 'vacancy', 'opening for', 'search for candidate',
+  'need developer', 'need engineer', 'need designer',
+  'hire developer', 'hire engineer', 'hire designer', 'hire professional', 'hire talent',
+  'looking for developer', 'looking for engineer', 'looking for talent', 'looking for professional',
+  'need talent', 'need professional', 'need developer', 'need engineer', 'need designer',
+  'need manager', 'need lead', 'need scientist', 'need analyst',
 ];
 
 const conversationState = {};
 
 function isHiringQuery(text) {
   const lowerText = text.toLowerCase();
-  return HIRING_KEYWORDS.some(keyword => lowerText.includes(keyword));
+
+  // Must have explicit hiring intent - not just keywords like "AI" or "developer"
+  const hasHiringIntent = HIRING_KEYWORDS.some(keyword => lowerText.includes(keyword));
+
+  // Additional check: must have role-related words along with hiring intent
+  const hasRole = /\b(developer|engineer|designer|manager|lead|scientist|analyst)\b/i.test(text);
+
+  return hasHiringIntent && hasRole;
 }
 
 function hasEnoughDetails(text) {
@@ -26,7 +36,7 @@ function askForDetails() {
   return {
     success: true,
     needsMoreInfo: true,
-    message: "Please provide: role, skills, experience years, and location (optional)."
+    message: "Please provide the role, required skills, and years of experience."
   };
 }
 

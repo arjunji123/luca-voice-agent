@@ -103,7 +103,7 @@ Remember: You're a helpful friend, not a corporate assistant.`,
     format: 'WAV',
     timeout: 60000,
     // Natural voice settings
-    speed: 1.0,  // Normal speed - not too fast
+    speed: 0.9,  // Normal speed - not too fast
     style: 'conversational'  // Casual tone
   },
 
