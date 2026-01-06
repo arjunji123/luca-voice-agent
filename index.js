@@ -124,8 +124,17 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
     console.error('TTS Error: Invalid text:', text);
     return null;
   }
+
+  // Trim whitespace but keep the full text
+  text = text.trim();
+
   try {
-    console.log(messages.INFO.GENERATING_AUDIO.replace("{chars}", text.length));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🎤 TTS Input:');
+    console.log(`   Text: "${text}"`);
+    console.log(`   Length: ${text.length} characters`);
+    console.log(`   Voice: ${voiceId}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     const response = await axios.post(config.API_ENDPOINTS.MURF_AI, {
       text: text,
@@ -133,8 +142,8 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
       model: config.TTS_CONFIG.model,
       format: config.TTS_CONFIG.format,
       sampleRate: config.SAMPLE_RATE,
-      speed: config.TTS_CONFIG.speed,        // Natural speed variation
-      style: config.TTS_CONFIG.style         // Conversational tone
+      speed: config.TTS_CONFIG.speed,
+      style: config.TTS_CONFIG.style
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -145,14 +154,17 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
     });
 
     const audioBuffer = Buffer.from(response.data);
-    console.log(messages.INFO.AUDIO_GENERATED.replace("{bytes}", audioBuffer.length));
+    console.log(`✅ Audio generated: ${audioBuffer.length} bytes`);
+    console.log(`   Estimated duration: ~${(audioBuffer.length / (config.SAMPLE_RATE * 2)).toFixed(1)}s`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
     return audioBuffer;
 
   } catch (error) {
-    console.error(messages.ERRORS.TTS_ERROR.replace("{message}", error.message));
+    console.error('❌ TTS Error:', error.message);
 
     if (text.length > 300 && error.message.includes('414')) {
-      console.log(messages.ERRORS.TTS_TIMEOUT);
+      console.log('⚠️  Text too long, truncating to 300 chars');
       const shortText = text.substring(0, 300);
       return await synthesizeAudio(shortText, voiceId);
     }
@@ -301,20 +313,31 @@ function createAgent(clientId, meetingUrl, onAudio) {
           assistantText = "I apologize, I'm having trouble processing that. Could you please try again?";
         }
 
+        // Log the full LLM response
+        console.log('\n🤖 LLM Response (Full):');
+        console.log(`   "${assistantText}"`);
+        console.log(`   Length: ${assistantText.length} characters\n`);
+
         // Truncate response if too long
         if (assistantText.length > config.MAX_RESPONSE_LENGTH) {
+          console.log(`⚠️  Response too long (${assistantText.length} chars), truncating to ${config.MAX_RESPONSE_LENGTH}`);
           assistantText = assistantText.substring(0, config.MAX_RESPONSE_LENGTH) + "...";
         }
 
         context.conversationHistory.push({ role: "assistant", content: assistantText });
+
+        console.log('📢 Sending to TTS...');
         const audioOutput = await synthesizeAudio(assistantText, agentConfig.model);
 
         // Check if audio was generated
         if (audioOutput) {
+          console.log(`📤 Sending audio to client (${audioOutput.length} bytes)`);
           onAudio({
             trigger: "realtime_audio.bot_output",
             data: { chunk: audioOutput.toString("base64"), sample_rate: config.SAMPLE_RATE }
           });
+        } else {
+          console.error('❌ No audio generated!');
         }
 
         console.log(messages.INFO.RESPONSE_SENT + "\n");

@@ -2,7 +2,7 @@
 module.exports = {
   PORT: process.env.PORT || 5005,
   SAMPLE_RATE: 16000,
-  AUDIO_BUFFER_TIMEOUT: 600,  // Reduced from 1000ms for faster response
+  AUDIO_BUFFER_TIMEOUT: 500,  // Further reduced for even faster response
   MIN_AUDIO_FOR_PROCESSING: 16000,
   SILENCE_THRESHOLD: 50,
 
@@ -62,7 +62,7 @@ Remember: You're a helpful friend, not a corporate assistant.`,
     model: 'en-US-natalie',
   },
 
-  MAX_RESPONSE_LENGTH: 200,  // Reduced for quicker responses
+  MAX_RESPONSE_LENGTH: 300,  // Allow fuller responses (was 200)
 
   END_KEYWORDS: [
     'thank you', 'thanks', 'thankyou', 'ty',
@@ -94,8 +94,8 @@ Remember: You're a helpful friend, not a corporate assistant.`,
   },
 
   LLM_CONFIG: {
-    model: 'openai/gpt-4o',
-    maxTokens: 80,  // Reduced for faster responses
+    model: 'openai/gpt-3.5-turbo',  // Faster than GPT-4o, good for quick responses
+    maxTokens: 60,  // Further reduced for faster responses
   },
 
   TTS_CONFIG: {
@@ -103,7 +103,7 @@ Remember: You're a helpful friend, not a corporate assistant.`,
     format: 'WAV',
     timeout: 60000,
     // Natural voice settings
-    speed: 1.15,  // Slightly faster, more natural
+    speed: 1.0,  // Normal speed - not too fast
     style: 'conversational'  // Casual tone
   },
 
