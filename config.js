@@ -58,8 +58,8 @@ Remember: You're a helpful friend, not a corporate assistant.`,
       "Hi there! Luca at your service. How can I help?"
     ],
 
-    // Natural voice model (Natalie is more conversational)
-    model: 'en-US-natalie',
+    // Natural male voice (Terrell - sounds like a real human)
+    model: 'en-US-terrell',
   },
 
   MAX_RESPONSE_LENGTH: 300,  // Allow fuller responses (was 200)
@@ -103,7 +103,7 @@ Remember: You're a helpful friend, not a corporate assistant.`,
     format: 'WAV',
     timeout: 60000,
     // Natural voice settings
-    speed: 0.9,  // Normal speed - not too fast
+    speed: 0.75,  // Much slower - clear and understandable
     style: 'conversational'  // Casual tone
   },
 
