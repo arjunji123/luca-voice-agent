@@ -118,6 +118,32 @@ async function getLLMResponse(userText, conversationHistory, clientId = 'default
   }
 }
 
+// Helper function to convert text to human-like SSML
+function enhanceTextWithSSML(text) {
+  // Don't enhance if already has SSML tags
+  if (text.includes('<speak>')) return text;
+
+  let ssml = text;
+
+  // Add natural pauses at punctuation
+  ssml = ssml.replace(/\./g, '.<break time="400ms"/>');
+  ssml = ssml.replace(/,/g, ',<break time="200ms"/>');
+  ssml = ssml.replace(/\?/g, '?<break time="500ms"/>');
+  ssml = ssml.replace(/!/g, '!<break time="400ms"/>');
+
+  // Add emphasis to important words (Great, Sure, Please, etc.)
+  const emphasisWords = ['great', 'sure', 'please', 'yes', 'no', 'hello', 'hi', 'thanks', 'sorry'];
+  emphasisWords.forEach(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    ssml = ssml.replace(regex, `<emphasis level="moderate">${word}</emphasis>`);
+  });
+
+  // Wrap in prosody for natural variation
+  ssml = `<speak><prosody rate="0.95" pitch="-1%">${ssml}</prosody></speak>`;
+
+  return ssml;
+}
+
 // Text to speech via Murf.ai
 async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model) {
   if (!text || typeof text !== 'string') {
@@ -128,22 +154,29 @@ async function synthesizeAudio(text, voiceId = config.DEFAULT_AGENT_CONFIG.model
   // Trim whitespace but keep the full text
   text = text.trim();
 
+  // Enhance with SSML for human-like speech
+  const enhancedText = enhanceTextWithSSML(text);
+
   try {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🎤 TTS Input:');
-    console.log(`   Text: "${text}"`);
+    console.log(`   Original: "${text}"`);
+    console.log(`   Enhanced: "${enhancedText.substring(0, 100)}..."`);
     console.log(`   Length: ${text.length} characters`);
     console.log(`   Voice: ${voiceId}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     const response = await axios.post(config.API_ENDPOINTS.MURF_AI, {
-      text: text,
+      text: enhancedText,  // Send SSML-enhanced text
       voiceId: voiceId,
       model: config.TTS_CONFIG.model,
       format: config.TTS_CONFIG.format,
       sampleRate: config.SAMPLE_RATE,
       speed: config.TTS_CONFIG.speed,
-      style: config.TTS_CONFIG.style
+      style: config.TTS_CONFIG.style,
+      pitch: config.TTS_CONFIG.pitch,  // Natural pitch variation
+      emotion: config.TTS_CONFIG.emotion,  // Friendly, warm tone
+      enableSSML: true  // Enable SSML processing
     }, {
       headers: {
         'Content-Type': 'application/json',
