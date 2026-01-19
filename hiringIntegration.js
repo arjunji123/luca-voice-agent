@@ -1,14 +1,16 @@
 const { sendHiringRequest } = require('./lookoutAPI');
 
-// More specific hiring keywords to avoid false positives
+// Hiring keywords - flexible to catch various phrases
 const HIRING_KEYWORDS = [
-  'hire someone', 'hiring for', 'recruit', 'recruiting', 'recruitment',
+  'want to hire', 'need to hire', 'looking to hire',
+  'hire someone', 'hiring for', 'hire a', 'hire an',
+  'recruit', 'recruiting', 'recruitment',
   'find candidate', 'find candidates', 'need candidate', 'looking for candidate',
   'job opening', 'vacancy', 'opening for', 'search for candidate',
   'need developer', 'need engineer', 'need designer',
   'hire developer', 'hire engineer', 'hire designer', 'hire professional', 'hire talent',
   'looking for developer', 'looking for engineer', 'looking for talent', 'looking for professional',
-  'need talent', 'need professional', 'need developer', 'need engineer', 'need designer',
+  'need talent', 'need professional',
   'need manager', 'need lead', 'need scientist', 'need analyst',
 ];
 
@@ -17,13 +19,16 @@ const conversationState = {};
 function isHiringQuery(text) {
   const lowerText = text.toLowerCase();
 
-  // Must have explicit hiring intent - not just keywords like "AI" or "developer"
+  // Check for hiring keywords
   const hasHiringIntent = HIRING_KEYWORDS.some(keyword => lowerText.includes(keyword));
 
-  // Additional check: must have role-related words along with hiring intent
-  const hasRole = /\b(developer|engineer|designer|manager|lead|scientist|analyst)\b/i.test(text);
+  // Check for role-related words
+  const hasRole = /\b(developer|engineer|designer|manager|lead|scientist|analyst|talent|professional)\b/i.test(text);
 
-  return hasHiringIntent && hasRole;
+  // Also check for standalone "hire" or "hiring" followed by role
+  const hasStandaloneHire = /\b(hire|hiring)\b/i.test(text) && hasRole;
+
+  return (hasHiringIntent && hasRole) || hasStandaloneHire;
 }
 
 function hasEnoughDetails(text) {
