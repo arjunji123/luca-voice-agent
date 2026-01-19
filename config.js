@@ -102,11 +102,9 @@ Remember: You're a helpful friend, not a corporate assistant.`,
     model: 'FALCON',
     format: 'WAV',
     timeout: 60000,
-    // Natural voice settings for human-like speech
+    // Natural voice settings
     speed: 0.85,  // Comfortable speaking pace
-    style: 'conversational',  // Casual tone
-    pitch: -2,  // Slightly lower pitch for natural male voice
-    emotion: 'friendly'  // Warm, approachable tone
+    style: 'conversational'  // Casual tone
   },
 
   TRANSCRIPTION_CONFIG: {
